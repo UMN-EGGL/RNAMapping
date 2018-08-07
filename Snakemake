@@ -1,0 +1,21 @@
+
+# export AWS_ACCESS_KEY=.....
+# export AWS_SECRET_KEY=.....
+# run the above lines in the shell before running snakemake 
+
+import os
+
+from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider              
+s3_key_id = os.environ.get('AWS_ACCESS_KEY')                                    
+s3_access_key = os.environ.get('AWS_SECRET_KEY')                                
+                                                                                
+S3 = S3RemoteProvider(                                                          
+    endpoint_url='https://s3.msi.umn.edu',                                      
+    access_key_id=s3_key_id,                                                    
+    secret_access_key=s3_access_key                                            
+)
+
+
+
+EQUCAB3_FASTA = S3.remote("FASTAs/EquCab2.nice.fna")
+
