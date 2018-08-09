@@ -43,4 +43,5 @@ COPY . root/RNAMapping
 # $ docker run -p 4000:4000 -it rnamap
 
 # Inside the container
-# $ cd RNAMapping
+# $ cd /root/RNAMapping
+# $ source activate default
