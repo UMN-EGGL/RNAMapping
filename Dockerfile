@@ -9,29 +9,32 @@ RUN apt-get -y update && apt-get install -y \
     wget \
     git \
     gcc \
-    unzip \
     build-essential \
 	apt-transport-https \
-    openjdk-8-jre-headless \
     python3 \
     python3-dev \
     python3-pip \
     zlib1g-dev \
     libbz2-dev
 
+RUN cd /root
+
+RUN wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+RUN bash miniconda.sh -b -f
+ENV PATH=/root/miniconda3/bin:${PATH}
+RUN conda update -n base conda
+
+RUN conda config --add channels conda-forge
+RUN conda config --add channels bioconda
+
+RUN conda create -y -n default python=3 fastqc star adapterremoval
+RUN /bin/bash -c "source activate default"
+
 RUN pip3 install ipython
 RUN pip3 install snakemake
 RUN pip3 install boto3
-RUN wget -O adapterremoval-2.2.2.tar.gz https://github.com/MikkelSchubert/adapterremoval/archive/v2.2.2.tar.gz
-RUN tar -xvzf adapterremoval-2.2.2.tar.gz
-RUN cd adapterremoval-2.2.2; make
-RUN wget https://github.com/alexdobin/STAR/archive/2.6.0a.tar.gz
-RUN tar -xvzf 2.6.0a.tar.gz
-RUN cd STAR-2.6.0a/source; make
-RUN wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.7.zip
-RUN unzip fastqc_v0.11.7.zip
-WORKDIR /RNAMapping
-COPY . RNAMapping
+
+COPY . root/RNAMapping
 
 # Build the Container with:
 # $ docker build -t rnamap:latest .
