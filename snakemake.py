@@ -16,16 +16,16 @@ TRIMS = ["trim1", "trim2"]
 rule all:
     input:
         expand("qc/qc_raw/{id}_{read}_001_fastqc.html", id=SAMPLES, read=READS),
-        expand("trimmed_data/{id}/{id}_R1_001_trim1.fastq.gz", id=SAMPLES),
-        expand("qc/qc_trim/{id}_{read}_001_{trim}_fasqc.html", id=SAMPLES, read=READS, trim=TRIMS)     
+#        expand("trimmed_data/{id}_{trim}.fastq.gz", id=SAMPLES, trim=TRIMS),
+        expand("qc/qc_trim/{id}_{trim}_fastqc.html", id=SAMPLES, trim=TRIMS)     
 
 rule trim_reads:
     input:
         R1 = FASTQ_DIR + "/{id}_R1_001.fastq",
         R2 = FASTQ_DIR + "/{id}_R2_001.fastq"
     output:
-        R1 = "trimmed_data/{id}/{id}_R1_001_trim1.fastq.gz",
-        R2 = "trimmed_data/{id}/{id}_R2_001_trim2.fastq.gz"
+        R1 = "trimmed_data/{id}_trim1.fastq.gz",
+        R2 = "trimmed_data/{id}_trim2.fastq.gz"
     message:
         "AdapterRemoval - removing adapters and low quality bases on {wildcards.id}"
     shell:
@@ -44,11 +44,11 @@ rule trim_reads:
 
 rule qc_trim:
     input:
-        "trimmed_data/{id}/{id}_{read}_001_{trim}.fastq.gz"
+        expand("trimmed_data/{id}_{trim}.fastq.gz", id=SAMPLES, trim=TRIMS)
     params:
         out_dir = "qc/qc_trim"
     output:
-        "qc/qc_trim/{id}_{read}_001_{trim}_fastqc.html"
+        "qc/qc_trim/{id}_{trim}_fastqc.html"
     shell:
         """
         fastqc \
