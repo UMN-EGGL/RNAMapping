@@ -17,7 +17,7 @@ SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/
 
 rule all:
     input:
-        S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES))
+        S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES, read=READS))
         S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES))
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.bam', sample=SAMPLES))
 
