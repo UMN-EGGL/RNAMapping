@@ -17,23 +17,23 @@ SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/
 
 rule all:
     input:
-        S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES))
-        S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES))
+        S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
+        S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.bam', sample=SAMPLES))
 
 # DOES NOT DEAL WITH .discarded.gz, .settings, .signleton.truncated.gz
 
 rule trim_reads:
     input:
-        R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq',
-        R2 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq'
+        R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq'),
+        R2 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq')
     output:
-        R1 = S3.remote(temp('trimmed_data/{sample}_trim1.fastq.gz')),
-        R2 = S3.remote(temp('trimmed_data/{sample}_trim2.fastq.gz'))
+        R1 = temp('trimmed_data/{sample}_trim1.fastq.gz'),
+        R2 = temp('trimmed_data/{sample}_trim2.fastq.gz')
     message:
         'AdapterRemoval - removing adapters and low quality bases on {wildcards.sample}'
     shell:
-        '''
+        ''' \
         AdapterRemoval \
         --file1 {input.R1} \
         --file2 {input.R2} \
@@ -84,7 +84,7 @@ rule qc_raw:
 rule STAR_mapping:
     input:
         R1 = S3.remote('trimmed_data/{sample}_trim1.fastq.gz'),
-        R2 = S3.remote('trimmed_data/{sample}_trim2.fastq.gz')
+        R2 = S3.remote('trimmed_data/{sample}_trim2.fastq.gz'),
         star_index = S3.remote('HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0')
     params:
         out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}')
