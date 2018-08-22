@@ -20,7 +20,7 @@ rule all:
     input:
         #S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.bam', sample=SAMPLES))
+        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES))
 
 # DOES NOT DEAL WITH .discarded.gz, .settings, .signleton.truncated.gz
 
@@ -112,12 +112,12 @@ rule STAR_mapping:
         R2 = 'trimmed_data/{sample}_trim2.fastq.gz',
         star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
     params:
-        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}'),
+        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_'),
         star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES'
     output:
-        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.bam')
+        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')
     message:
-        'STAR - performing mapping on {wildcards.sample} with {params.star_index}'
+        'STAR - Creating: {output} '
     run:
         assert os.path.exists(input.star_index)
         shell('''
