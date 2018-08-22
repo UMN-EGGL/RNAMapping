@@ -12,7 +12,7 @@ S3 = S3RemoteProvider(
 
 
 SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
-GCF = 'GCF_002863925.1_EquCab3.0'
+configfile: "config.yaml"
 
 # HAVE NOT MADE ANY CHANGES TO THREAD USAGE FOR ANY RULE
 
@@ -80,45 +80,54 @@ rule qc_raw:
         {input}
         '''
 
+rule download_STAR:
+    input:
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF'])
+
 #DOES NOT STORE UNMAPPED READS (--outReadsUnmapped) nor log output
 rule STAR_index:
     input:
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/Genome'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SA'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SAindex'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrLength.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrName.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrNameLength.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrStart.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonGeTrInfo.tab'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonInfo.tab'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/geneInfo.tab'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/genomeParameters.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbInfo.txt'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.fromGTF.out.tab'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.out.tab'),
-        S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/transcriptInfo.tab') 
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/Genome',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SA',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SAindex',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrLength.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrName.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrNameLength.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrStart.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonGeTrInfo.tab',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonInfo.tab',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/geneInfo.tab',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/genomeParameters.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbInfo.txt',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.fromGTF.out.tab',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.out.tab',GCF=config['GCF'])),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/transcriptInfo.tab',GCF=config['GCF'])) 
+    params:
+        outdir=expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/',GCF=config['GCF'])
     output:
-        directory('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/')
+        touch(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF']))
+    shell:
+        'cp {input} {params.outdir}'
 
 
 rule STAR_mapping:
     input:
         R1 = 'trimmed_data/{sample}_trim1.fastq.gz',
         R2 = 'trimmed_data/{sample}_trim2.fastq.gz',
+        star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
     params:
-        star_index = directory('HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/'),
         out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}')
     output:
         S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.bam')
     message:
         'STAR - performing mapping on {wildcards.sample} with {params.star_index}'
-    shell:
-        '''
+    run:
+        assert os.path.exists(input.star_index)
+        shell('''
         STAR \
         --genomeDir {params.star_index} \
         --readFilesIn {input.R1} {input.R2} \
         --readFilesCommand gunzip -c \
         --outFileNamePrefix {params.out_prefix} \
         --outSAMtype BAM Unsorted \
-        '''
+        ''')
