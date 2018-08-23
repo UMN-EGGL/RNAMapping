@@ -44,7 +44,6 @@ RUN /bin/bash -c "source activate default"
 #RUN wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py
 #RUN python3 get-pip.py
 RUN pip install ipython
-RUN pip install locuspocus
 # The official snakemake is broken right now, use the patched one
 RUN pip install git+https://bitbucket.org/LinkageIO/snakemake
 #RUN pip install snakemake
@@ -58,7 +57,9 @@ COPY . /root/RNAMapping
 
 RUN cd /root/RNAMapping
 
-ENTRYPOINT ["snakemake", "-s", "/root/RNAMapping/Snakefile"]
+WORKDIR /root/RNAMapping
+#ENTRYPOINT ["snakemake", "-s", "/root/RNAMapping/Snakefile"]
+ENTRYPOINT ["snakemake"]
 
 
 # -----------------------------
