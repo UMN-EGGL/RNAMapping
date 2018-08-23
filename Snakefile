@@ -123,6 +123,7 @@ rule STAR_mapping:
         shell('''
         STAR \
         --genomeDir {params.star_index} \
+        --genomeLoad LoadAndKeep \
         --readFilesIn {input.R1} {input.R2} \
         --readFilesCommand gunzip -c \
         --outFileNamePrefix {params.out_prefix} \
