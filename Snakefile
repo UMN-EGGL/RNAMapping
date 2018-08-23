@@ -110,12 +110,12 @@ rule STAR_mapping:
     input:
         R1 = 'trimmed_data/{sample}_trim1.fastq.gz',
         R2 = 'trimmed_data/{sample}_trim2.fastq.gz',
-        star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
-    params:
-        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_'),
-        star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES'
+        star_index = expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF'])
     output:
         S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')
+    params:
+        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_'),
+        star_index = expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES',GCF=config['GCF'])
     message:
         'STAR - Creating: {output} '
     run:
