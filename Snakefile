@@ -20,9 +20,14 @@ rule all:
     input:
         #S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES))
+        #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
+        gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
 
 # DOES NOT DEAL WITH .discarded.gz, .settings, .signleton.truncated.gz
+
+# ----------------------------------------------------------
+#       Trimming
+# ----------------------------------------------------------
 
 rule trim_reads:
     input:
@@ -45,6 +50,10 @@ rule trim_reads:
         --trimqualities \
         --minquality 10 \
         '''
+
+# ----------------------------------------------------------
+#       QC
+# ----------------------------------------------------------
 
 rule qc_trim:
     input:
@@ -79,6 +88,10 @@ rule qc_raw:
         -f fastq \
         {input}
         '''
+
+# ----------------------------------------------------------
+#       STAR Mapping
+# ----------------------------------------------------------
 
 rule download_STAR:
     input:
@@ -128,4 +141,24 @@ rule STAR_mapping:
         --readFilesCommand gunzip -c \
         --outFileNamePrefix {params.out_prefix} \
         --outSAMtype BAM Unsorted \
+        ''')
+
+# ----------------------------------------------------------
+#       StringTie
+# ----------------------------------------------------------
+
+# 90M_ATCACG_L004
+
+rule run_stringtie:
+    input:
+        bam = S3.remote(ancient('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')),
+        gff = S3.remote(expand(ancient("HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz"), GCF=config['GCF']))
+    output:
+        gff = S3.remote( f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/{{sample}}.gff" )
+    run:
+        shell('''
+        stringtie \
+        {input.bam} \
+        -G {input.gff} \
+        -o {output.gff}
         ''')
