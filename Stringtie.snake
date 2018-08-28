@@ -18,16 +18,13 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        #S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
-        #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
-        #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
-        S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
-        #expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff", GCF=config['GCF'],sample=['90M_ATCACG_L004'])
+        #S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
 
 
 rule sort_bam:
     input:
-        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam',keep_local=True),
+        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam'),
     output:
         sortedbam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.sorted.bam'
     shell:
@@ -49,3 +46,21 @@ rule run_stringtie:
         -G {input.gff} \
         -o {output.gff}
         ''')
+
+
+rule stringtie_merge:
+    input:
+        gffs = S3.remote(expand(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/{{sample}}.gff",sample=SAMPLES)),
+        refgff = S3.remote(expand("HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz", GCF=config['GCF']),keep_local=True)
+    output:
+        merged_gff=expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+    run:
+        # Write each gff, one per line
+        with open('all_GFFs_list.txt') as OUT: 
+            print('\n'.join(input.gffs),file=OUT)
+        shell('''
+            stringtie \
+            --merge -p 10 -o {output.merged_gff} \
+            -G {input.refgff}
+        ''')
+        
