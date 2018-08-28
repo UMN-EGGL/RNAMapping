@@ -30,19 +30,9 @@ rule all:
     input:
         #S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
-<<<<<<< HEAD
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES))
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)
         gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
-=======
-
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES),
-        gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
-
-
-# DOES NOT DEAL WITH .discarded.gz, .settings, .signleton.truncated.gz
->>>>>>> 8482fc2945466363c8d65ad94cf9ea7d22f0614a
 
 # ----------------------------------------------------------
 #       Trimming
@@ -70,10 +60,6 @@ rule trim_reads:
         --minquality 10 \
         '''
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 8482fc2945466363c8d65ad94cf9ea7d22f0614a
 rule trim_se_read:
     input:
         R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
@@ -95,10 +81,6 @@ rule trim_se_read:
 # ----------------------------------------------------------
 #       QC
 # ----------------------------------------------------------
-<<<<<<< HEAD
-=======
-
->>>>>>> 8482fc2945466363c8d65ad94cf9ea7d22f0614a
 
 rule qc_trim:
     input:
@@ -229,7 +211,4 @@ rule run_stringtie:
         -G {input.gff} \
         -o {output.gff}
         ''')
-<<<<<<< HEAD
-=======
 
->>>>>>> 8482fc2945466363c8d65ad94cf9ea7d22f0614a
