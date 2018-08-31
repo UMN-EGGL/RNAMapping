@@ -15,13 +15,13 @@ S3 = S3RemoteProvider(
 )
 
 rna_seq_dir = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq')
-SE_SAMPLES_TMP = []
+se_samples_tmp = []
 for path in glob.glob('{}{}'.format(rna_seq_dir,'/*.fastq.gz')):
     dir_path, se_file = os.path.split(path)
     se_file = re.search(r'^(.*?)(_R[1-2]_)',se_file).group(1)
-    SE_SAMPLES_TMP.append(se_file)
+    se_samples_tmp.append(se_file)
     
-SE_SAMPLES = [k for k, v in Counter(SE_SAMPLES_TMP).items() if v == 1]
+SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
 
 SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
 configfile: "config.yaml"
@@ -29,7 +29,7 @@ configfile: "config.yaml"
 rule all:
     input:
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam',sample=SAMPLES)),
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES)),
+#       S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES)),
         gff = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff', sample=SAMPLES,GCF=config['GCF']))
 
 # ----------------------------------------------------------
