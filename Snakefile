@@ -21,7 +21,7 @@ for path in glob.glob('{}{}'.format(rna_seq_dir,'/*.fastq.gz')):
     se_file = re.search(r'^(.*?)(_R[1-2]_)',se_file).group(1)
     se_samples_tmp.append(se_file)
     
-SE_SAMPLES = [rna_seq_dir + k for k, v in Counter(se_samples_tmp).items() if v == 1]
+SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
 
 SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
 configfile: "config.yaml"
@@ -30,7 +30,7 @@ rule all:
     input:
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam',sample=SAMPLES)),
 #	S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES)),
-	S3.remote(expand('{sample}',sample=SE_SAMPLES)),
+#	S3.remote(expand('{sample}',sample=SE_SAMPLES)),
 	gff = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff', sample=SAMPLES,GCF=config['GCF']))
 
 # ----------------------------------------------------------
