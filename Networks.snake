@@ -1,0 +1,134 @@
+import os
+
+from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
+s3_key_id = os.environ.get('AWS_ACCESS_KEY')
+s3_access_key = os.environ.get('AWS_SECRET_KEY')
+
+S3 = S3RemoteProvider(
+    endpoint_url='https://s3.msi.umn.edu', 
+    access_key_id=s3_key_id, 
+    secret_access_key=s3_access_key
+)
+
+
+
+SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
+configfile: "config.yaml"
+
+rule all:
+    input:
+        #'/home/rob/.camoco/databases/Expr.EcMuscle.db',
+        #'/home/rob/.camoco/databases/Expr.EcFat.db',
+        #'/home/rob/.camoco/databases/Expr.EcTissue.db'
+        f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/tissue_gene_fpkm.tsv",
+        f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/muscle_gene_fpkm.tsv",
+        f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/fat_gene_fpkm.tsv",
+
+
+rule make_muscle_tsv:
+    input:
+        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    output:
+        tsv = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/muscle_gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        muscle = [
+             '11M_GGCTAC_L004', '12M_AGTCAA_L005', '12M_AGTCAA_L006', '14M_ACAGTG_L004', '17M_CTTGTA_L005',
+             '17M_CTTGTA_L006', '1M_GCCAAT_L004', '20M_TTAGGC_L004', '35M_ACTTGA_L004', '36M_ATGTCA_L005', 
+             '36M_ATGTCA_L006', '37M_GATCAG_L004', '38M_ATTCCT_L005', '38M_ATTCCT_L006', '39M_CGTACG_L005',
+             '39M_CGTACG_L006', '40M_GTCCGC_L005', '40M_GTCCGC_L006', '41M_TGACCA_L004', '49M_ATCACG_L005', 
+             '49M_ATCACG_L006', '50M_CGATGT_L004', '51M_GTGAAA_L005', '51M_GTGAAA_L006', '52M_GAGTGG_L005',
+             '52M_GAGTGG_L006', '61M_ACTGAT_L005', '61M_ACTGAT_L006', '64M_GTGGCC_L005', '64M_GTGGCC_L006', 
+             '65M_GTTTCG_L005', '65M_GTTTCG_L006', '66M_TAGCTT_L004', '67M_AGTTCC_L005', '67M_AGTTCC_L006',
+             '68M_CCGTCC_L005', '68M_CCGTCC_L006', '69M_TTAGGC_L005', '69M_TTAGGC_L006', '82M_TGACCA_L005', 
+             '82M_TGACCA_L006', '86M_CGATGT_L005', '86M_CGATGT_L006', '87M_CAGATC_L004', '90M_ATCACG_L004'
+        ]
+        raw_df = pd.read_table(input.gene_fpkm,sep='\t')
+        raw_df.set_index('gene_name',inplace=True)
+        raw_df = raw_df.loc[:,muscle]
+        samples = set([x.split('_')[0] for x in muscle])
+        df = pd.DataFrame()
+        for sample in samples:
+            df[sample] = raw_df.loc[:,[i.startswith(sample) for i in raw_df.columns]].mean(axis=1)
+        df.index = raw_df.index
+        df.to_csv(output.tsv,sep='\t')
+        
+
+rule make_fat_tsv:
+    input:
+        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    output:
+        tsv = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/fat_gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        fat = [
+             '11F_ATGTCA_L007','11F_ATGTCA_L008','12F_GTCCGC_L007','12F_GTCCGC_L008','14F_GATCAG_L005',
+             '14F_GATCAG_L006', '17F_CCGTCC_L007', '17F_CCGTCC_L008', '1F_TAGCTT_L007',
+             '1F_TAGCTT_L008', '20F_CAGATC_L005', '20F_CAGATC_L006', '35F_CTTGTA_L007',
+             '35F_CTTGTA_L008', '36F_GTGGCC_L007', '36F_GTGGCC_L008', '37F_AGTCAA_L007',
+             '37F_AGTCAA_L008', '38F_TGACCA_L007', '38F_TGACCA_L008', '39F_ATCACG_L007',
+             '39F_ATCACG_L008', '40F_CGTACG_L007', '40F_CGTACG_L008', '41F_ACTTGA_L005',
+             '41F_ACTTGA_L006', '49F_ACAGTG_L007', '49F_ACAGTG_L008', '50F_GCCAAT_L005',
+             '50F_GCCAAT_L006', '51F_GAGTGG_L007', '51F_GAGTGG_L008', '52F_CGATGT_L007',
+             '52F_CGATGT_L008', '61F_TTAGGC_L007', '61F_TTAGGC_L008', '64F_ACTGAT_L007',
+             '64F_ACTGAT_L008', '65F_ATTCCT_L007', '65F_ATTCCT_L008', '66F_AGTTCC_L007',
+             '66F_AGTTCC_L008', '67F_GTGAAA_L007', '67F_GTGAAA_L008', '68F_GTTTCG_L007',
+             '68F_GTTTCG_L008', '69F_CAGATC_L007', '69F_CAGATC_L008', '82F_ACTTGA_L007',
+             '82F_ACTTGA_L008', '86F_GCCAAT_L007', '86F_GCCAAT_L008', '87F_GGCTAC_L007',
+             '87F_GGCTAC_L008', '90F_ACAGTG_L005', '90F_ACAGTG_L006'
+        ]
+        raw_df = pd.read_table(input.gene_fpkm,sep='\t')
+        raw_df.set_index('gene_name',inplace=True)
+        raw_df = raw_df.loc[:,fat]
+        samples = set([x.split('_')[0] for x in fat])
+        df = pd.DataFrame()
+        for sample in samples:
+            df[sample] = raw_df.loc[:,[i.startswith(sample) for i in raw_df.columns]].mean(axis=1)
+        df.index = raw_df.index
+        df.to_csv(output.tsv,sep='\t')
+ 
+
+rule make_tissue:
+    input:
+        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    output:
+        tsv = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/tissue_gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        tissue = [
+            'Bone_1_10Y_Paint_GAGTGG_L008', 'Bone_2_9Y_QH_ACTGAT_L008', 'Bone_3_10Y_QH_ATTCCT_L008', 'Bone_4_12Y_Morgan_ATCACG_L008',
+            'Cartilage_1_10Y_Paint_CGATGT_L008', 'Cartilage_2_9Y_QH_AGTTCC_L002', 'Cartilage_4_12Y_Morgan_CCGTCC_L002', 'Cartilage_3_10Y_QH_ATGTCA_L002',
+            'Fat_shoulder_1_10Y_Paint_TGACCA_L006', 'Fat_shoulder_2_9Y_QH_ACAGTG_L006', 'Fat_shoulder_3_10Y_QH_GCCAAT_L007', 'Fat_shoulder_4_12Y_Morgan_CAGATC_L007', 
+            'Fat_tailhead_1_10Y_Paint_CGATGT_L006', 'Fat_tailhead_2_9Y_QH_TTAGGC_L006', 'Fat_tailhead_3_10Y_QH_GGCTAC_L007', 'Fat_tailhead_4_12Y_Morgan_CTTGTA_L007', 
+            'Lamina_1_10Y_Paint_CGTACG_L005', 'Lamina_2_9Y_QH_TAGCTT_L002', 'Lamina_3_10Y_QH_GGCTAC_L002', 'Lamina_4_12Y_Morgan_TAGCTT_L007', 
+            'Liver_1_10Y_Paint_GTCCGC_L005', 'Liver_2_9Y_QH_ACTTGA_L007', 'Liver_2_9Y_QH_GTGAAA_L005', 'Liver_3_10Y_QH_GATCAG_L007', 'Liver_3_10Y_QH_GTGGCC_L005', 'Liver_4_12Y_Morgan_GTTTCG_L005', 
+            'Nuchal_fat_1_10Y_Paint_ATCACG_L003', 'Nuchal_fat_2_9Y_QH_CGATGT_L003', 'Nuchal_fat_3_10Y_QH_TTAGGC_L003', 'Nuchal_fat_4_12_Y_Morgan_TGACCA_L003', 
+            'Omental_fat_1_10Y_Paint_AGTCAA_L004', 'Omental_fat_2_9Y_QH_AGTTCC_L004', 'Omental_fat_3_10Y_QH_ATGTCA_L004', 'Omental_fat_4_12_Y_Morgan_CCGTCC_L005', 
+            'Retroperitoneal_fat_1_10Y_Paint_ACAGTG_L003', 'Retroperitoneal_fat_2_9Y_QH_GCCAAT_L003', 'Retroperitoneal_fat_3_10Y_QH_CAGATC_L003', 'Retroperitoneal_fat_4_12_Y_Morgan_ACTTGA_L003',
+            'Synovium_1_10Y_Paint_GAGTGG_L005', 'Synovium_2_9Y_QH_ACTGAT_L006', 'Synovium_3_10Y_QH_ATTCCT_L006', 'Synovium_4_12Y_Morgan_ATCACG_L006',
+            'Visceral_fat_1_10Y_Paint_GATCAG_L004', 'Visceral_fat_2_9Y_QH_TAGCTT_L004', 'Visceral_fat_3_10Y_QH_GGCTAC_L004', 'Visceral_fat_4_12_Y_Morgan_CTTGTA_L004'
+        ]  
+        raw_df = pd.read_table(input.gene_fpkm,sep='\t')
+        raw_df.set_index('gene_name',inplace=True)
+        raw_df = raw_df.loc[:,tissue]
+        raw_df.to_csv(output.tsv,sep='\t')
+ 
+rule make_refgen:
+    input:
+        gff = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/GCF_002863925.1_EquCab3.0_genomic.nice.gff'
+    output:
+        '~/.camoco/databases/RefGen.EquCab3.db'
+    run:
+        shell(
+            'camoco build-refgen '
+            '{input.gff} '
+            'EquCab3 '
+            '"EquCab3 Genes" '
+            'Ec3 '
+            'Horse '
+            '--chrom-feature region '
+            '--gene-feature gene '
+            '--ID-attr gene'
+        )
+
+

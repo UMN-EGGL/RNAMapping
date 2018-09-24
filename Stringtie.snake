@@ -18,13 +18,15 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        #S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
-        expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+        #expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged/{sample}/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF'])
+        #expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+        f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/transcript_fpkm.tsv",
+        f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
 
 
 rule sort_bam:
     input:
-        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam'),
+        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')
     output:
         sortedbam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.sorted.bam'
     shell:
@@ -50,17 +52,58 @@ rule run_stringtie:
 
 rule stringtie_merge:
     input:
-        gffs = S3.remote(expand(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/{{sample}}.gff",sample=SAMPLES)),
+        gffs = S3.remote(expand(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/{{sample}}.gff",sample=SAMPLES),keep_local=True),
         refgff = S3.remote(expand("HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz", GCF=config['GCF']),keep_local=True)
     output:
         merged_gff=expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
     run:
         # Write each gff, one per line
-        with open('all_GFFs_list.txt') as OUT: 
+        with open('all_GFFs_list.txt','w') as OUT: 
             print('\n'.join(input.gffs),file=OUT)
         shell('''
             stringtie \
             --merge -p 10 -o {output.merged_gff} \
-            -G {input.refgff}
+            -G {input.refgff} \
+            all_GFFs_list.txt
         ''')
-        
+
+
+rule stringtie_recalculate_on_merged:
+    input:
+        bam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.sorted.bam',
+        merged_gff=expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+    output:
+        countsdir = directory(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/{{sample}}/counts"),
+        gff = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/{{sample}}/{{sample}}.gff"
+    run:
+        shell('''
+        stringtie \
+        -e \
+        -b {output.countsdir}\
+        -G {input.merged_gff} \
+        -o {output.gff} \
+        {input.bam}
+        ''')
+
+rule make_FPKM_tables:
+    input:
+        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged/{sample}/counts/t_data.ctab',GCF=config['GCF'],sample=SAMPLES)
+    output:
+        transcript_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/transcript_fpkm.tsv",
+        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        import numpy  as np
+        dfs = []
+        for sample,f in zip(SAMPLES,input):
+            df = pd.read_table(f)
+            df['sample'] = sample
+            dfs.append(df)
+        df = pd.concat(dfs)
+        by_transcript = pd.pivot_table(df,index='t_name',columns='sample',values='FPKM')
+        by_transcript.to_csv(output.transcript_fpkm,sep='\t')
+        by_gene = pd.pivot_table(df,index='gene_name',columns='sample',values='FPKM',aggfunc=np.mean)
+        by_gene.to_csv(output.gene_fpkm,sep='\t')
+
+
+       
