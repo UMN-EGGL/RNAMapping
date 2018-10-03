@@ -57,9 +57,17 @@ rule trim_reads:
         --minquality 10 \
         '''
 
+rule get_se_fastqs:
+    input:
+	S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
+    output:
+	'se_fastq/{sample}.fastq.gz'
+    run:
+	shell(' cp {output[0]} ./')
+
 rule trim_se_read:
     input:
-        R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
+        R1 = 'se_fastq/{sample}_R1_001.fastq.gz'
     output:
         R1 = temp('trimmed_data/{sample}_se_trim.fastq.gz')
     message:
