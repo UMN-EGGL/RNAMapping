@@ -63,11 +63,11 @@ rule get_se_fastqs:
     output:
         'HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz'
     run:
-        shell('cp {output[0]} ./se_fastq')
+        shell('cp {input[0]} output[0]')
 
 rule trim_se_read:
     input:
-        R1 = 'se_fastqs/{sample}_R1_001.fastq.gz'
+        R1 = 'HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz' 
     output:
         R1 = temp('trimmed_data/{sample}_se_trim.fastq.gz')
     message:
