@@ -67,7 +67,7 @@ rule get_se_fastqs:
 
 rule trim_se_read:
     input:
-        R1 = 'se_fastq/{sample}_R1_001.fastq.gz'
+        R1 = 'se_fastqs/{sample}_R1_001.fastq.gz'
     output:
         R1 = temp('trimmed_data/{sample}_se_trim.fastq.gz')
     message:
