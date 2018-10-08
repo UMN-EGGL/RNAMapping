@@ -31,7 +31,7 @@ rule all:
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
         S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)),
-        gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
+        #gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
 
 # ----------------------------------------------------------
 #       Trimming
