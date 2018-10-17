@@ -182,7 +182,7 @@ rule STAR_mapping_se:
         R1 = '/scratch/single_end_mapping/trimmed_data/{sample}_se_trim.fastq.gz',
         #star_index = '/scratch/HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
     params:
-        out_prefix = '/scratch/single_end_mapping/RNASEQ/bam/{sample}_se_',
+        out_prefix = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_',
         star_index = '/scratch/single_end_mapping/HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES'
     output:
         '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam'
