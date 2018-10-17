@@ -30,8 +30,9 @@ rule all:
         #S3.remote(expand('qc/qc_raw/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
-        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)),
-        gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
+        #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)),
+        expand('/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES),
+        #gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
 
 # ----------------------------------------------------------
 #       Trimming
@@ -56,23 +57,22 @@ rule trim_reads:
         --gzip \
         --trimns \
         --trimqualities \
-        --minquality 10 \
         '''
 
-rule get_se_fastqs:
-    input:
-        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
-    output:
-        'local/HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz'
-    run:
-        shell('cp {input[0]} {output[0]}')
+#rule get_se_fastqs:
+#    input:
+#        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
+#    output:
+#        'local/HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz'
+#    run:
+#        shell('cp {input[0]} {output[0]}')
 
 rule trim_se_read:
     input:
-        R1 = 'local/HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz' 
+        R1 = '/scratch/single_end_mapping/se_fastq/{sample}_R1_001.fastq.gz' 
         #R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
     output:
-        R1 = temp('trimmed_data/{sample}_se_trim.fastq.gz')
+        R1 = '/scratch/single_end_mapping/trimmed_data/{sample}_se_trim.fastq.gz'
     message:
         'AdapterRemoval - removing adapters and low quality bases on SE reads {wildcards.sample}'
     shell:
@@ -151,7 +151,7 @@ rule STAR_index:
         S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.out.tab',GCF=config['GCF']),keep_local=True),
         S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/transcriptInfo.tab',GCF=config['GCF']),keep_local=True) 
     output:
-        touch(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF']))
+        touch(expand('/scratch/single_end_maping/HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF']))
 
 rule STAR_mapping:
     input:
@@ -179,17 +179,17 @@ rule STAR_mapping:
 
 rule STAR_mapping_se:
     input:
-        R1 = 'trimmed_data/{sample}_se_trim.fastq.gz',
-        star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
+        R1 = '/scratch/single_end_mapping/trimmed_data/{sample}_se_trim.fastq.gz',
+        #star_index = '/scratch/HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
     params:
-        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_'),
-        star_index = 'HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES'
+        out_prefix = '/scratch/single_end_mapping/HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_',
+        star_index = '/scratch/single_end_mapping/HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES'
     output:
-        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam')
+        '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam'
     message:
         'STAR - Creating: {output} '
     run:
-        assert os.path.exists(input.star_index)
+        #assert os.path.exists(params.star_index)
         shell('''
         STAR \
         --genomeDir {params.star_index} \
