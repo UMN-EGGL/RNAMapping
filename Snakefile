@@ -31,8 +31,9 @@ rule all:
         #S3.remote(expand('qc/qc_trim/{sample}_fastqc.html', sample=SAMPLES)),
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)),
-        expand('/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES),
+        #expand('/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES),
         #gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
+        gff = expand("/scratch/single_end_mapping/refgen/GCF_002863925.1_EquCab3.0/GFF/{sample}.gff", sample=SE_SAMPLES)
 
 # ----------------------------------------------------------
 #       Trimming
@@ -220,3 +221,16 @@ rule run_stringtie:
         -o {output.gff}
         ''')
 
+rule se_run_stringtie:
+    input:
+        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',
+        gff = expand('/scratch/RNAMapping/HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz', GCF=config['GCF'])
+    output:
+        gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/{{sample}}.gff"
+    run:
+        shell('''
+        stringtie \
+        {input.bam} \
+        -G {input.gff} \
+        -o {output.gff}
+        ''')
