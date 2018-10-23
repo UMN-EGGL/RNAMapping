@@ -32,8 +32,12 @@ rule all:
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam', sample=SAMPLES)),
         #S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_se_Aligned.out.bam', sample=SE_SAMPLES)),
         #expand('/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',sample=SE_SAMPLES),
-        #gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF']))
-        gff = expand("/scratch/single_end_mapping/refgen/GCF_002863925.1_EquCab3.0/GFF/{sample}.gff", sample=SE_SAMPLES)
+        #gff = S3.remote( expand("HorseGeneAnnotation/public/refgen/{GCF}/GFF/{sample}.gff" ,sample=SAMPLES,GCF=config['GCF'])),
+        #gff = expand("/scratch/single_end_mapping/refgen/GCF_002863925.1_EquCab3.0/GFF/{sample}.gff", sample=SE_SAMPLES),
+        #merged_gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/merged.gff"
+        #gff = expand(f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/{{sample}}/{{sample}}.gff", sample=SE_SAMPLES)
+        f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/transcript_fpkm.tsv",
+        f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
 
 # ----------------------------------------------------------
 #       Trimming
@@ -221,9 +225,19 @@ rule run_stringtie:
         -o {output.gff}
         ''')
 
+rule se_sort_bam:
+    input:
+        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam'
+    output:
+        sorted_bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam'
+    shell:
+        '''
+        samtools view -u {input.bam} | samtools sort -o {output.sorted_bam}
+        '''
+
 rule se_run_stringtie:
     input:
-        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam',
+        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam',
         gff = expand('/scratch/RNAMapping/HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz', GCF=config['GCF'])
     output:
         gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/{{sample}}.gff"
@@ -234,3 +248,57 @@ rule se_run_stringtie:
         -G {input.gff} \
         -o {output.gff}
         ''')
+
+rule se_stringtie_merge:
+    input:
+        gffs = expand(f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/{{sample}}.gff", sample=SE_SAMPLES),
+        ref_gff = expand('/scratch/RNAMapping/HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz', GCF=config['GCF'])
+    output:
+        merged_gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/merged.gff"
+    run:
+        with open('all_GFFs_list.txt','w') as OUT:
+            print('\n'.join(input.gffs),file=OUT)
+        shell('''
+        stringtie \
+        --merge -p 10 -o {output.merged_gff} \
+        -G {input.ref_gff} \
+        all_GFFs_list.txt
+        ''')
+
+rule se_stringtie_recalc_on_merged:
+    input:
+        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam',
+        merged_gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/merged.gff"
+    output:
+        counts_dir = directory(f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/{{sample}}/counts"),
+        gff = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/{{sample}}/{{sample}}.gff"
+    run:
+        shell('''
+        stringtie \
+        -e \
+        -b {output.counts_dir} \
+        -G {input.merged_gff} \
+        -o {output.gff} \
+        {input.bam}
+        ''')
+
+rule se_make_FPKM_tables:
+    input:
+        counts = expand('/scratch/single_end_mapping/refgen/{GCF}/GFF/Merged/{sample}/counts/t_data.ctab', GCF=config['GCF'], sample=SE_SAMPLES)
+    output:
+        transcript_fpkm = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/transcript_fpkm.tsv",
+        gene_fpkm = f"/scratch/single_end_mapping/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        import numpy as np
+        dfs = []
+        for sample,f in zip(SE_SAMPLES,input):
+            df = pd.read_table(f)
+            df['sample'] = sample
+            dfs.append(df)
+        df = pd.concat(dfs)
+        by_transcript = pd.pivot_table(df,index='t_name',columns='sample',values='FPKM')
+        by_transcript.to_csv(output.transcript_fpkm,sep='\t')
+        by_gene = pd.pivot_table(df,index='gene_name',columns='sample',values='FPKM',aggfunc=np.mean)
+        by_gene.to_csv(output.gene_fpkm,sep='\t')
+
