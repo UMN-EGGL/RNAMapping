@@ -3,6 +3,22 @@ import glob
 import re
 from collections import Counter
 
+'''
+The file hierarchy looks like:
+    
+    ./HorseGeneAnnotation/
+        private/
+            sequence/
+                RNASEQ/
+        public/
+	    refgen/
+	        {NCBI_GCF,ENSEMBL_GCA}/
+		    STAR_INDICES/
+       	            {SE,PE}/
+	                GFF/
+		            Merged/
+
+'''
 
 from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
 s3_key_id = os.environ.get('AWS_ACCESS_KEY')
@@ -43,7 +59,7 @@ rule all:
 #       Trimming
 # ----------------------------------------------------------
 
-rule trim_reads:
+rule pe_trim_reads:
     input:
         R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz'),
         R2 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
@@ -72,7 +88,8 @@ rule trim_reads:
 #    run:
 #        shell('cp {input[0]} {output[0]}')
 
-rule trim_se_read:
+
+rule se_trim_read:
     input:
         R1 = '/scratch/single_end_mapping/se_fastq/{sample}_R1_001.fastq.gz' 
         #R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz')
@@ -95,70 +112,96 @@ rule trim_se_read:
 #       QC
 # ----------------------------------------------------------
 
-rule qc_trim:
-    input:
-        S3.remote('trimmed_data/{sample}.fastq.gz')
-    params:
-        out_dir = S3.remote('qc/qc_trim')
-    output:
-        S3.remote('qc/qc_trim/{sample}_fastqc.html')
-    message:
-        'FastQC - performing quality control on trimmed {wildcards.sample}'
-    shell:
-        '''
-        fastqc \
-        -o {params.out_dir} \
-        -f fastq \
-        {input}
-        '''
-
-rule qc_raw:
-    input:
-        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}.fastq.gz')
-    params:
-        out_dir = S3.remote('qc/qc_raw')
-    output:
-        S3.remote('qc/qc_raw/{sample}_fastqc.html')
-    message:
-        'FastQC - performing quality control on {wildcards.sample}'
-    shell:
-        '''
-        fastqc \
-        -o {params.out_dir} \
-        -f fastq \
-        {input}
-        '''
+#rule qc_trim:
+#    input:
+#        S3.remote('trimmed_data/{sample}.fastq.gz')
+#    params:
+#        out_dir = S3.remote('qc/qc_trim')
+#    output:
+#        S3.remote('qc/qc_trim/{sample}_fastqc.html')
+#    message:
+#        'FastQC - performing quality control on trimmed {wildcards.sample}'
+#    shell:
+#        '''
+#        fastqc \
+#        -o {params.out_dir} \
+#        -f fastq \
+#        {input}
+#        '''
+#
+#rule qc_raw:
+#    input:
+#        S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}.fastq.gz')
+#    params:
+#        out_dir = S3.remote('qc/qc_raw')
+#    output:
+#        S3.remote('qc/qc_raw/{sample}_fastqc.html')
+#    message:
+#        'FastQC - performing quality control on {wildcards.sample}'
+#    shell:
+#        '''
+#        fastqc \
+#        -o {params.out_dir} \
+#        -f fastq \
+#        {input}
+#        '''
 
 # ----------------------------------------------------------
-#       STAR Mapping
+#       STAR indices
 # ----------------------------------------------------------
 
 rule download_STAR:
     input:
-        expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF'])
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['NCBI_GCF'])
+        expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/download.done',GCA=config['ENSEMBL_GCA']
 
 #DOES NOT STORE UNMAPPED READS (--outReadsUnmapped) nor log output
-rule STAR_index:
+rule ncbi_STAR_index:
     input:
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/Genome',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SA',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SAindex',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrLength.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrName.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrNameLength.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrStart.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonGeTrInfo.tab',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonInfo.tab',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/geneInfo.tab',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/genomeParameters.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbInfo.txt',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.fromGTF.out.tab',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.out.tab',GCF=config['GCF']),keep_local=True),
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/transcriptInfo.tab',GCF=config['GCF']),keep_local=True) 
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/Genome',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SA',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/SAindex',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrLength.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrName.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrNameLength.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/chrStart.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonGeTrInfo.tab',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/exonInfo.tab',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/geneInfo.tab',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/genomeParameters.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbInfo.txt',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.fromGTF.out.tab',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/sjdbList.out.tab',GCF=config['NCBI_GCF']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/transcriptInfo.tab',GCF=config['NCBI_GCF']),keep_local=True) 
     output:
-        touch(expand('/scratch/single_end_maping/HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['GCF']))
+        touch(expand('/scratch/single_end_maping/HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES/download.done',GCF=config['NCBI_GCF']))
 
-rule STAR_mapping:
+
+rule ensembl_STAR_index:
+    input:
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/Genome',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/SA',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/SAindex',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/chrLength.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/chrName.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/chrNameLength.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/chrStart.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/exonGeTrInfo.tab',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/exonInfo.tab',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/geneInfo.tab',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/genomeParameters.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/sjdbInfo.txt',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/sjdbList.fromGTF.out.tab',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/sjdbList.out.tab',GCF=config['ENSEMBL_GCA']),keep_local=True),
+        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/transcriptInfo.tab',GCF=config['ENSEMBL_GCA']),keep_local=True) 
+    output:
+        touch(expand('/scratch/single_end_maping/HorseGeneAnnotation/public/refgen/{GCA}/STAR_INDICES/download.done',GCF=config['ENSEMBL_GCA']))
+
+# ----------------------------------------------------------
+#       STAR mapping
+# ----------------------------------------------------------
+
+rule pe_STAR_mapping:
     input:
         R1 = 'trimmed_data/{sample}_trim1.fastq.gz',
         R2 = 'trimmed_data/{sample}_trim2.fastq.gz',
@@ -182,7 +225,7 @@ rule STAR_mapping:
         --outSAMtype BAM Unsorted \
         ''')
 
-rule STAR_mapping_se:
+rule se_STAR_mapping:
     input:
         R1 = '/scratch/single_end_mapping/trimmed_data/{sample}_se_trim.fastq.gz',
         #star_index = '/scratch/HorseGeneAnnotation/public/refgen/GCF_002863925.1_EquCab3.0/STAR_INDICES/download.done'
@@ -209,9 +252,29 @@ rule STAR_mapping_se:
 #       StringTie
 # ----------------------------------------------------------
 
-# 90M_ATCACG_L004
+# SORT BAMS
+rule pe_sort_bam:
+    input:
+        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')
+    output:
+        sortedbam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.sorted.bam'
+    shell:
+        '''
+        samtools view -u {input.bam} | samtools sort - -o {output.sortedbam}
+        '''
 
-rule run_stringtie:
+rule se_sort_bam:
+    input:
+        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam'
+    output:
+        sorted_bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam'
+    shell:
+        '''
+        samtools view -u {input.bam} | samtools sort -o {output.sorted_bam}
+        '''
+
+# RUN STRINGTIE
+rule pe_run_stringtie:
     input:
         bam = S3.remote(ancient('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}_Aligned.out.bam')),
         gff = S3.remote(expand(ancient("HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz"), GCF=config['GCF']))
@@ -225,16 +288,6 @@ rule run_stringtie:
         -o {output.gff}
         ''')
 
-rule se_sort_bam:
-    input:
-        bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se_Aligned.out.bam'
-    output:
-        sorted_bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam'
-    shell:
-        '''
-        samtools view -u {input.bam} | samtools sort -o {output.sorted_bam}
-        '''
-
 rule se_run_stringtie:
     input:
         bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam',
@@ -247,6 +300,24 @@ rule se_run_stringtie:
         {input.bam} \
         -G {input.gff} \
         -o {output.gff}
+        ''')
+
+# STRINGTIE ON MERGE
+rule pe_stringtie_merge:
+    input:
+        gffs = S3.remote(expand(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/{{sample}}.gff",sample=SAMPLES),keep_local=True),
+        refgff = S3.remote(expand("HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz", GCF=config['GCF']),keep_local=True)
+    output:
+        merged_gff=expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+    run:
+        # Write each gff, one per line
+        with open('all_GFFs_list.txt','w') as OUT:
+            print('\n'.join(input.gffs),file=OUT)
+        shell('''
+            stringtie \
+            --merge -p 10 -o {output.merged_gff} \
+            -G {input.refgff} \
+            all_GFFs_list.txt
         ''')
 
 rule se_stringtie_merge:
@@ -265,6 +336,24 @@ rule se_stringtie_merge:
         all_GFFs_list.txt
         ''')
 
+# STRINGTIE RECALC ON MERGE
+rule pe_stringtie_recalculate_on_merged:
+    input:
+        bam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{sample}.sorted.bam',
+        merged_gff=expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged.gff',GCF=config['GCF'])
+    output:
+        countsdir = directory(f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/{{sample}}/counts"),
+        gff = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/{{sample}}/{{sample}}.gff"
+    run:
+        shell('''
+        stringtie \
+        -e \
+        -b {output.countsdir}\
+        -G {input.merged_gff} \
+        -o {output.gff} \
+        {input.bam}
+        ''')
+
 rule se_stringtie_recalc_on_merged:
     input:
         bam = '/scratch/single_end_mapping/star_map_se/RNASEQ/bam/{sample}_se.sorted.bam',
@@ -281,6 +370,31 @@ rule se_stringtie_recalc_on_merged:
         -o {output.gff} \
         {input.bam}
         ''')
+
+
+# ----------------------------------------------------------
+#       Make FPKM tables
+# ----------------------------------------------------------
+
+rule se_make_FPKM_tables:
+    input:
+        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/GFF/Merged/{sample}/counts/t_data.ctab',GCF=config['GCF'],sample=SAMPLES)
+    output:
+        transcript_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/transcript_fpkm.tsv",
+        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['GCF']}/GFF/Merged/gene_fpkm.tsv"
+    run:
+        import pandas as pd
+        import numpy  as np
+        dfs = []
+        for sample,f in zip(SAMPLES,input):
+            df = pd.read_table(f)
+            df['sample'] = sample
+            dfs.append(df)
+        df = pd.concat(dfs)
+        by_transcript = pd.pivot_table(df,index='t_name',columns='sample',values='FPKM')
+        by_transcript.to_csv(output.transcript_fpkm,sep='\t')
+        by_gene = pd.pivot_table(df,index='gene_name',columns='sample',values='FPKM',aggfunc=np.mean)
+        by_gene.to_csv(output.gene_fpkm,sep='\t')
 
 rule se_make_FPKM_tables:
     input:
