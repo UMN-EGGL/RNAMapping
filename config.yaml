@@ -1,2 +1,5 @@
 NCBI_GCF: 'GCF_002863925.1_EquCab3.0'
-ENSEMBL_GCA: 'GCA_002863925.1_EquCab3.0'
+ENSEMBL_GCA: 'Equus_caballus.EquCab3.0.95'
+REF_GFFS:
+    A: 'GCF_002863925.1_EquCab3.0'
+    B: 'Equus_caballus.EquCab3.0.95'
