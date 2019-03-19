@@ -43,7 +43,8 @@ SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
 SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
 configfile: "config.yaml"
 
-REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
+#REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
+REF_GFF = [f"{config['NCBI_GCF']}"]
 
 rule all:
     input:
@@ -53,8 +54,8 @@ rule all:
 #        multiple refs
 #        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_Aligned.out.bam',GCF=REF_GFF,sample=SAMPLES))
 #        expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',GCF=REF_GFF,sample=SAMPLES)
-        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',GCF=REF_GFF,sample=SAMPLES))
-#        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF),
+#        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',GCF=REF_GFF,sample=SAMPLES))
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF),
 #        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff',sample=SAMPLES,GCF=REF_GFF)
 
 # ----------------------------------------------------------
@@ -329,17 +330,26 @@ rule pe_run_stringtie:
 #        -o {output.gff}
 #        ''')
 
+rule create_merged_GFF_file:
+    input:
+        gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF),keep_local=True)
+    output:
+        gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt'
+    run:
+        with open(output.gff_list,'w') as OUT:
+            print('\n'.join(input.gffs),file=OUT)
+
+
 # STRINGTIE ON MERGE
 rule pe_stringtie_merge:
     input:
         gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF),keep_local=True),
-        refgff = S3.remote(ancient('HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz'),keep_local=True)
+        ref_gff = S3.remote(ancient('HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz'),keep_local=True),
+        gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt'
     output:
         merged_gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff'
     run:
         # Write each gff, one per line
-        with open('all_GFFs_list.txt','w') as OUT:
-            print('\n'.join(input.gffs),file=OUT)
         shell('''
             stringtie \
             --merge -p 10 -o {output.merged_gff} \
