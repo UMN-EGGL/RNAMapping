@@ -45,7 +45,8 @@ SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
 SAMPLES, = S3.glob_wildcards(os.path.join(f"{config['FQ_INPUT']}","{sample}_R2_001.fastq.gz"))
 
 #REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
-REF_GFF = [f"{config['NCBI_GCF']}"]
+#REF_GFF = [f"{config['NCBI_GCF']}"]
+REF_GFF = [f"{config['ENSEMBL_GCA']}"]
 
 rule all:
     input:
@@ -221,7 +222,7 @@ rule pe_STAR_mapping:
     message:
         'STAR - Creating: {output} '
     run:
-        assert os.path.exists(input.star_index)
+        assert os.path.exists(input.star_dl)
         shell('''
         STAR \
         --genomeDir {params.star_index} \
@@ -307,7 +308,7 @@ rule pe_sort_bam:
 # RUN STRINGTIE
 rule pe_run_stringtie:
     input:
-        bam = S3.remote(ancient('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_Aligned.out.bam'),keep_local=True),
+        bam = S3.remote(ancient('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam'),keep_local=True),
         ref_gff = S3.remote(ancient('HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz'),keep_local=True)
     output:
         gff = S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',keep_local=True)
