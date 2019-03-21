@@ -33,6 +33,8 @@ S3 = S3RemoteProvider(
     secret_access_key=s3_access_key
 )
 
+configfile: "config.yaml" 
+
 se_samples_tmp = []
 for path in [x for x in S3._s3c.list_keys('HorseGeneAnnotation') if 'fastq' in x]: 
     dir_path, se_file = os.path.split(path)
@@ -40,8 +42,7 @@ for path in [x for x in S3._s3c.list_keys('HorseGeneAnnotation') if 'fastq' in x
     se_samples_tmp.append(se_file)
     
 SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
-SAMPLES, = S3.glob_wildcards('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
-configfile: "config.yaml"
+SAMPLES, = S3.glob_wildcards(os.path.join(f"{config['FQ_INPUT']}","{sample}_R2_001.fastq.gz"))
 
 #REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
 REF_GFF = [f"{config['NCBI_GCF']}"]
@@ -55,8 +56,10 @@ rule all:
 #        S3.remote(expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_Aligned.out.bam',GCF=REF_GFF,sample=SAMPLES))
 #        expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',GCF=REF_GFF,sample=SAMPLES)
 #        S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',GCF=REF_GFF,sample=SAMPLES))
-        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF),
+#        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF),
 #        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff',sample=SAMPLES,GCF=REF_GFF)
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/transcript_fpkm.tsv',GCF=REF_GFF),
+        expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/gene_fpkm.tsv',GCF=REF_GFF)
 
 # ----------------------------------------------------------
 #       Trimming
@@ -334,7 +337,7 @@ rule create_merged_GFF_file:
     input:
         gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF),keep_local=True)
     output:
-        gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt'
+        gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt',
     run:
         with open(output.gff_list,'w') as OUT:
             print('\n'.join(input.gffs),file=OUT)
@@ -349,7 +352,6 @@ rule pe_stringtie_merge:
     output:
         merged_gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff'
     run:
-        # Write each gff, one per line
         shell('''
             stringtie \
             --merge -p 10 -o {output.merged_gff} \
@@ -376,13 +378,13 @@ rule pe_stringtie_merge:
 # STRINGTIE RECALC ON MERGE
 rule pe_stringtie_recalculate_on_merged:
     input:
-        bam = expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',sample=SAMPLES,GCF=REF_GFF),
-        merged_gff = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF)
+        #bam = expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',sample=SAMPLES,GCF=REF_GFF),
+        #merged_gff = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF)
+        bam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',
+        merged_gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff'
     output:
-#        countsdir = directory(f"HorseGeneAnnotation/public/refgen/{config['NCBI_GCF']}/paired_end/GFF/Merged/{{sample}}/counts"),
-#        gff = f"HorseGeneAnnotation/public/refgen/{config['NCBI_GCF']}/paired_end/GFF/Merged/{{sample}}/{{sample}}.gff"
-        countsdir = directory(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts',sample=SAMPLES,GCF=REF_GFF)),
-        gff = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff',sample=SAMPLES,GCF=REF_GFF)
+        countsdir = directory('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts'),
+        gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff'
     run:
         shell('''
         stringtie \
@@ -417,15 +419,16 @@ rule pe_stringtie_recalculate_on_merged:
 
 rule pe_make_FPKM_tables:
     input:
-        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/t_data.ctab',GCF=config['NCBI_GCF'],sample=SAMPLES)
+        #counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/t_data.ctab',GCF=REF_GFF,sample=SAMPLES)
+        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts',GCF=REF_GFF,sample=SAMPLES)
     output:
-        transcript_fpkm = f"HorseGeneAnnotation/public/refgen/{config['NCBI_GCF']}/paired_end/GFF/Merged/transcript_fpkm.tsv",
-        gene_fpkm = f"HorseGeneAnnotation/public/refgen/{config['NCBI_GCF']}/paired_end/GFF/Merged/gene_fpkm.tsv"
+        transcript_fpkm = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/transcript_fpkm.tsv',
+        gene_fpkm = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/gene_fpkm.tsv'
     run:
         import pandas as pd
         import numpy  as np
         dfs = []
-        for sample,f in zip(SAMPLES,input):
+        for sample,f in zip(SAMPLES,os.path.join(input,'t_data.ctab')):
             df = pd.read_table(f)
             df['sample'] = sample
             dfs.append(df)
