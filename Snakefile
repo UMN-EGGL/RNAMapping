@@ -45,8 +45,8 @@ SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
 SAMPLES, = S3.glob_wildcards(os.path.join(f"{config['FQ_INPUT']}","{sample}_R2_001.fastq.gz"))
 
 #REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
-#REF_GFF = [f"{config['NCBI_GCF']}"]
-REF_GFF = [f"{config['ENSEMBL_GCA']}"]
+REF_GFF = [f"{config['NCBI_GCF']}"]
+#REF_GFF = [f"{config['ENSEMBL_GCA']}"]
 
 rule all:
     input:
@@ -68,8 +68,8 @@ rule all:
 
 rule pe_trim_reads:
     input:
-        R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz',keep_local=True),
-        R2 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz',keep_local=True)
+        R1 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R1_001.fastq.gz'),
+        R2 = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/fastq/{sample}_R2_001.fastq.gz')
     output:
         R1 = temp('pe_trimmed_data/{sample}_trim1.fastq.gz'),
         R2 = temp('pe_trimmed_data/{sample}_trim2.fastq.gz')
@@ -217,7 +217,7 @@ rule pe_STAR_mapping:
     output:
         S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_Aligned.out.bam')
     params:
-        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_',keep_local=True),
+        out_prefix = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}_'),
         star_index = 'HorseGeneAnnotation/public/refgen/{GCF}/STAR_INDICES'
     message:
         'STAR - Creating: {output} '
@@ -338,7 +338,7 @@ rule pe_run_stringtie:
 
 rule create_merged_GFF_file:
     input:
-        gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF),keep_local=True)
+        gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF))
     output:
         gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt',
     run:
@@ -349,8 +349,8 @@ rule create_merged_GFF_file:
 # STRINGTIE ON MERGE
 rule pe_stringtie_merge:
     input:
-        gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF),keep_local=True),
-        ref_gff = S3.remote(ancient('HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz'),keep_local=True),
+        gffs = S3.remote(expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/{sample}.gff',sample=SAMPLES,GCF=REF_GFF)),
+        ref_gff = S3.remote(ancient('HorseGeneAnnotation/public/refgen/{GCF}/{GCF}_genomic.nice.gff.gz')),
         gff_list = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/all_GFFs_list.txt'
     output:
         merged_gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff'
@@ -383,11 +383,11 @@ rule pe_stringtie_recalculate_on_merged:
     input:
         #bam = expand('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',sample=SAMPLES,GCF=REF_GFF),
         #merged_gff = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff',GCF=REF_GFF)
-        bam = 'HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam',
+        bam = S3.remote('HorseGeneAnnotation/private/sequence/RNASEQ/bam/{GCF}/paired_end/{sample}.sorted.bam'),
         merged_gff = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged.gff'
     output:
         countsdir = directory('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts'),
-        gff = S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff')
+        gff = S3.remote('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/{sample}.gff',keep_local=True)
     run:
         shell('''
         stringtie \
@@ -420,22 +420,22 @@ rule pe_stringtie_recalculate_on_merged:
 #       Make FPKM tables
 # ----------------------------------------------------------
 
-rule download_counts:
-    input:
-        'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/download.done'
-
-
-rule stringtie_counts:
-    input:
-        'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/t_data.ctab'
-    output:
-        touch('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/download.done')
+#rule download_counts:
+#    input:
+#        'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/download.done'
+#
+#
+#rule stringtie_counts:
+#    input:
+#        'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/t_data.ctab'
+#    output:
+#        touch('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/download.done')
 
 
 rule pe_make_FPKM_tables:
     input:
-        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/t_data.ctab',GCF=REF_GFF,sample=SAMPLES)
-        #counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts',GCF=REF_GFF,sample=SAMPLES)
+        #counts_dl = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts/download.done',GCF=REF_GFF,sample=SAMPLES)
+        counts = expand('HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/{sample}/counts',GCF=REF_GFF,sample=SAMPLES)
     output:
         transcript_fpkm = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/transcript_fpkm.tsv',
         gene_fpkm = 'HorseGeneAnnotation/public/refgen/{GCF}/paired_end/GFF/Merged/gene_fpkm.tsv'
@@ -443,8 +443,8 @@ rule pe_make_FPKM_tables:
         import pandas as pd
         import numpy  as np
         dfs = []
-        #counts = os.path.join(input.counts,'t_data.ctab')
-        for sample,f in zip(SAMPLES,input):
+        ctabs = [os.path.join(c,'t_data.ctab') for c in input.counts]
+        for sample,f in zip(SAMPLES,ctabs):
             df = pd.read_table(f)
             df['sample'] = sample
             dfs.append(df)
