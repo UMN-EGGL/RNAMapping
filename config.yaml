@@ -1,3 +1,5 @@
+USERNAME: 'cull0084'
 NCBI_GCF: 'GCF_002863925.1_EquCab3.0'
 ENSEMBL_GCA: 'Equus_caballus.EquCab3.0.95'
 FQ_INPUT: 'HorseGeneAnnotation/private/sequence/RNASEQ/fastq'
+MSI_INPUT: '/home/mccuem/data_release/novaseq/181112_A00223_0050_AHCWF7DSXX/McCue_Project_035'
