@@ -1,4 +1,5 @@
 import os
+import paramiko
 import glob
 import re
 from collections import Counter
@@ -23,26 +24,35 @@ The file hierarchy looks like:
 
 '''
 
-from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
-s3_key_id = os.environ.get('AWS_ACCESS_KEY')
-s3_access_key = os.environ.get('AWS_SECRET_KEY')
-
-S3 = S3RemoteProvider(
-    endpoint_url='https://s3.msi.umn.edu', 
-    access_key_id=s3_key_id, 
-    secret_access_key=s3_access_key
-)
+#from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
+#s3_key_id = os.environ.get('AWS_ACCESS_KEY')
+#s3_access_key = os.environ.get('AWS_SECRET_KEY')
+#
+#S3 = S3RemoteProvider(
+#    endpoint_url='https://s3.msi.umn.edu', 
+#    access_key_id=s3_key_id, 
+#    secret_access_key=s3_access_key
+#)
 
 configfile: "config.yaml" 
 
-se_samples_tmp = []
-for path in [x for x in S3._s3c.list_keys('HorseGeneAnnotation') if 'fastq' in x]: 
-    dir_path, se_file = os.path.split(path)
-    se_file = re.search(r'^(.*?)(_R[1-2]_)',se_file).group(1)
-    se_samples_tmp.append(se_file)
-    
-SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
-SAMPLES, = S3.glob_wildcards(os.path.join(f"{config['FQ_INPUT']}","{sample}_R2_001.fastq.gz"))
+from snakemake.remote.SFTP import RemoteProvider as SFTPRemoteProvider
+key = paramiko.agent.Agent().get_keys()[0]
+
+SFTP = SFTPRemoteProvider('login.msi.umn.edu',username='cull0084',private_key='/project/cull0084/.ssh/id_rsa')
+
+#se_samples_tmp = []
+#for path in [x for x in S3._s3c.list_keys('HorseGeneAnnotation') if 'fastq' in x]: 
+#    dir_path, se_file = os.path.split(path)
+#    se_file = re.search(r'^(.*?)(_R[1-2]_)',se_file).group(1)
+#    se_samples_tmp.append(se_file)
+#    
+#SE_SAMPLES = [k for k, v in Counter(se_samples_tmp).items() if v == 1]
+
+#SAMPLES, = SFTP.glob_wildcards(os.path.join(f"{config['MSI_INPUT']}","{sample}_R2_001.fastq.gz"))
+
+#SAMPLES, = SFTP.glob_wildcards("/home/mccuem/data_release/umgc/novaseq/190306_A00223_0089_BH5HJ5DRXX/McCue_Project_032/{sample}_R2_001.fastq.gz")
+SAMPLES, = SFTP.glob_wildcards("/home/fried255/cull0084/SNAKETEST/{sample}_R2_001.fastq.gz")
 
 #REF_GFF = [f"{config['NCBI_GCF']}", f"{config['ENSEMBL_GCA']}"]
 REF_GFF = [f"{config['NCBI_GCF']}"]
