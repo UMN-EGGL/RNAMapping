@@ -41,7 +41,7 @@ from snakemake.remote.SFTP import RemoteProvider as SFTPRemoteProvider
 key = paramiko.agent.Agent().get_keys()[0]
 
 #SFTP = SFTPRemoteProvider('login.msi.umn.edu',username='cull0084',private_key='/project/cull0084/.ssh/id_rsa')
-SFTP = SFTPRemoteProvider(username='cull0084',private_key=key)
+SFTP = SFTPRemoteProvider(username=config['USERNAME'],private_key=key)
 
 #se_samples_tmp = []
 #for path in [x for x in S3._s3c.list_keys('HorseGeneAnnotation') if 'fastq' in x]: 
